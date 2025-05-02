@@ -1,23 +1,141 @@
-name: Pylint
+# app.py
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
-on: [push]
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SECRET_KEY'] = 'your_secret_key'
+db = SQLAlchemy(app)
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pylint
-    - name: Analysing the code with pylint
-      run: |
-        pylint $(git ls-files '*.py')
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), nullable=False, unique=True)
+    password = db.Column(db.String(150), nullable=False)
+
+@app.route('/')
+def home():
+    return render_template('home.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+        new_user = User(username=username, password=password)
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registered successfully!')
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            session['user_id'] = user.id
+            flash('Login successful!')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid credentials')
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('dashboard.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    flash('Logged out successfully')
+    return redirect(url_for('login'))
+
+if __name__ == '__main__':
+    db.create_all()
+    app.run(debug=True)
+
+
+# templates/home.html
+<!DOCTYPE html>
+<html>
+<head><title>Home</title></head>
+<body>
+  <h1>Welcome to the User Management App</h1>
+  <a href="/register">Register</a> | <a href="/login">Login</a>
+</body>
+</html>
+
+# templates/register.html
+<!DOCTYPE html>
+<html>
+<head><title>Register</title></head>
+<body>
+  <h2>Register</h2>
+  <form method="POST">
+    Username: <input name="username" required><br>
+    Password: <input type="password" name="password" required><br>
+    <button type="submit">Register</button>
+  </form>
+</body>
+</html>
+
+# templates/login.html
+<!DOCTYPE html>
+<html>
+<head><title>Login</title></head>
+<body>
+  <h2>Login</h2>
+  <form method="POST">
+    Username: <input name="username" required><br>
+    Password: <input type="password" name="password" required><br>
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
+
+# templates/dashboard.html
+<!DOCTYPE html>
+<html>
+<head><title>Dashboard</title></head>
+<body>
+  <h2>Dashboard</h2>
+  <p>You are logged in!</p>
+  <a href="/logout">Logout</a>
+</body>
+</html>
+
+# requirements.txt
+Flask
+Flask_SQLAlchemy
+Werkzeug
+
+# README.md
+# User Management App
+
+A basic Flask app for user registration and login management.
+
+## Features
+- Register/Login/Logout
+- SQLite backend
+- Password hashing with Werkzeug
+
+## Setup
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+## Gitflow Usage
+- `main`: Stable code
+- `development`: Active development
+
+## Screenshot
+(Include screenshot before submitting)
+
+## Author
+Created for final project submission.
